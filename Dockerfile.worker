@@ -1,0 +1,12 @@
+FROM node:24-bookworm-slim
+WORKDIR /srv/print
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY tsconfig.json ./
+COPY assets/fonts ./assets/fonts
+COPY src/domain ./src/domain
+COPY src/server ./src/server
+COPY scripts/worker.ts ./scripts/worker.ts
+ENV NODE_ENV=production APP_MODE=hosted
+USER node
+CMD ["npm", "run", "worker"]
