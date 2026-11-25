@@ -67,7 +67,14 @@ export async function authenticate(input: z.infer<typeof authInput>, create: boo
       redirect.searchParams.set('next', accountReturn(input.next));
       const { data, error } = await auth.signUp({ email: input.email, password: input.password,
         options: { data: { full_name: input.name }, emailRedirectTo: redirect.href } });
-      if (error) throw new PrintError(error.status === 429 ? 'Too many attempts. Try again later.' : 'Could not register this account.');
+      if (error) {
+        if (error.status === undefined || error.status >= 500 ||
+            error.code === 'email_address_not_authorized' || error.code === 'over_email_send_rate_limit') {
+          console.warn('Supabase Auth signup failed', { status: error.status, code: error.code });
+        }
+        if (error.status === 429) throw new PrintError('Too many attempts. Try again later.', 429);
+        throw new PrintError('Could not register this account.');
+      }
       return { confirmationRequired: !data.session };
     }
     const { error } = await auth.signInWithPassword({ email: input.email, password: input.password });

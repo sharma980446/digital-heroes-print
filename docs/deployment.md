@@ -9,7 +9,15 @@
 5. Run a persistent Node worker with `npm run worker` or build and run `Dockerfile.worker`. Provide the hosted database, Supabase Storage, app origin, and optional email environment variables to that service. It processes the database queue and notification outbox. The web app stays available on Vercel while worker capacity scales independently. Production file downloads redirect to short-lived, private storage URLs after the role and order checks. Large jobs have numbered archives.
 6. Repeat both reference orders from a clean session. Verify the public URL, signup and staff access, real Stripe test confirmation, Supabase Storage, and email arrival in the test inbox. Record order IDs, proof versions and files. Share reviewer credentials through a private channel.
 
-Set `RESEND_API_KEY` and `EMAIL_FROM` to enable email delivery. The outbox records each recipient and provider acceptance and retries transient errors with the notification ID as the provider idempotency key. Local mode records demo notifications. Use the provider dashboard and test inbox for final delivery evidence. [Resend idempotency keys](https://resend.com/docs/dashboard/emails/idempotency-keys)
+### Signup confirmation email
+
+In the dedicated Supabase project, open **Authentication → Email → SMTP Settings** and enable custom SMTP. For Resend, use host `smtp.resend.com`, port `465`, username `resend`, and a Resend sending API key as the password. Set the sender address to an address on your verified Resend domain. The built-in Supabase sender is limited to project team addresses. [Supabase SMTP limits](https://supabase.com/docs/guides/auth/auth-smtp) · [Resend SMTP setup](https://resend.com/docs/send-with-supabase-smtp)
+
+After saving, sign up with a fresh email address you control and check for the message in Resend's email activity. If the message is missing, check the Supabase Auth logs for that signup and the Vercel function logs for the signup request. If it is delivered, open the confirmation link and verify it returns to the deployed app.
+
+### Order notification email
+
+Set `RESEND_API_KEY` and `EMAIL_FROM` on the hosted worker. Use a sender on your verified domain for reviewer and customer inboxes. The outbox records provider acceptance and retries delivery with the notification ID as the provider idempotency key. Local mode records demo notifications. [Resend idempotency keys](https://resend.com/docs/dashboard/emails/idempotency-keys)
 
 ## Schema
 
