@@ -4,7 +4,7 @@ import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { money } from '@/domain/catalogue';
+import { ORDER_CURRENCY, money, taxName } from '@/domain/catalogue';
 import type { orderDetails } from '@/server/orders';
 import { api, ApiError, dateLabel, endpoint, Feedback, Loading, message, SignInPanel, stateName, Tag, useLoad, useSession } from './ui';
 
@@ -52,9 +52,9 @@ function StatusPanel({ detail, staff, action, busy }: { detail: Detail; staff: b
         <div><dt>Trim size</dt><dd>{order.config.width} × {order.config.height} mm</dd></div>
         <div><dt>Material</dt><dd>{order.price.material}</dd></div>
         <div><dt>Quantity</dt><dd>{order.config.quantity}</dd></div>
-        <div><dt>Net subtotal</dt><dd>{money(order.price.subtotal)}</dd></div>
-        <div><dt>VAT</dt><dd>{money(order.price.tax)}</dd></div>
-        <div className="total-line"><dt>Total</dt><dd>{money(order.price.total)}</dd></div>
+        <div><dt>Net subtotal</dt><dd>{money(order.price.subtotal, order.price.currency)}</dd></div>
+        <div><dt>{taxName(order.price.currency)}</dt><dd>{money(order.price.tax, order.price.currency)}</dd></div>
+        <div className="total-line"><dt>Total</dt><dd>{money(order.price.total, order.price.currency)}</dd></div>
       </dl>
       {order.paid_at ? <a className="button secondary full" href={endpoint(`orders/${order.id}/receipt`)}>Download receipt</a> : null}
     </section>
@@ -76,6 +76,7 @@ function ProofPanel({ detail, staff, onEdit, editable, action, busy, pay }: {
   if (!proof) return <section className="panel empty"><h2>No proof yet</h2><p>The print team needs artwork to publish a proof.</p></section>;
   const image = endpoint(`orders/${order.id}/proof/${proof.id}?row=${row}`);
   const isCurrent = current?.id === proof.id && order.proof_state !== 'draft';
+  const needsInrQuote = !staff && order.price.currency !== ORDER_CURRENCY;
   return <section className="panel proof-panel">
     <div className="panel-head spread"><div>
       <h2>Print proof</h2>
@@ -109,12 +110,14 @@ function ProofPanel({ detail, staff, onEdit, editable, action, busy, pay }: {
       <div className="actions"><button className="button secondary" type="button" onClick={() => setChanges(false)}>Back</button>
         <button className="button" disabled={busy || !comment.trim()}>Send change request</button></div>
     </form> : <div className="actions">
-      {editable ? <button className="button secondary" disabled={busy} onClick={onEdit}>{staff ? 'Revise artwork' : 'Edit artwork'}</button> : null}
+      {editable ? <button className="button secondary" disabled={busy} onClick={onEdit}>
+        {needsInrQuote ? 'Review INR quote' : staff ? 'Revise artwork' : 'Edit artwork'}
+      </button> : null}
       {!staff && !order.paid_at && !order.payment_review && isCurrent && order.proof_state === 'review' ? <>
         <button className="button secondary" disabled={busy} onClick={() => setChanges(true)}>Request changes</button>
         <button className="button" disabled={busy || loaded !== image} onClick={() => void action('approve', { proofId: proof.id, revision: order.revision })}>Approve v{proof.version}</button>
       </> : null}
-      {!staff && !order.paid_at && !order.payment_review && isCurrent && order.proof_state === 'approved' ? <button className="button"
+      {!staff && !needsInrQuote && !order.paid_at && !order.payment_review && isCurrent && order.proof_state === 'approved' ? <button className="button"
         disabled={busy} onClick={pay}>Continue to test checkout</button> : null}
     </div>}
   </section>;
@@ -153,7 +156,7 @@ function History({ detail, staff }: { detail: Detail; staff: boolean }) {
       </li>)}
     </ol>
     {staff && detail.payments.length ? <details><summary>Payment records</summary><ul>
-      {detail.payments.map((payment) => <li key={payment.reference}><strong>{money(payment.amount)}</strong> · {payment.status} · {payment.reference}</li>)}
+      {detail.payments.map((payment) => <li key={payment.reference}><strong>{money(payment.amount, payment.currency)}</strong> · {payment.status} · {payment.reference}</li>)}
     </ul></details> : null}
     {staff && detail.notifications.length ? <details><summary>Notification log</summary><ul>
       {detail.notifications.map((notification, index) => <li key={index}>{stateName(notification.event_type)} · {stateName(notification.status)}
@@ -229,7 +232,7 @@ export function OrderScreen({ id }: { id: string }) {
     <div className="page-head compact spread"><div>
       <Link className="back" href={staff ? '/staff' : '/account'}>{staff ? 'Production console' : 'Order history'}</Link>
       <span className="eyebrow order-number">DH{order.number}</span><h1>{order.product_snapshot.title}</h1>
-      <p>{order.config.quantity} units · {order.price.material} · {money(order.price.total)} incl. VAT</p>
+      <p>{order.config.quantity} units · {order.price.material} · {money(order.price.total, order.price.currency)} incl. tax</p>
     </div>{!staff && order.paid_at && !order.payment_review ? <button className="button secondary" disabled={busy} onClick={() => void repeat()}>Reorder design</button> : null}</div>
     <Feedback error={actionError || error} info={checkPayment ? 'Waiting for the payment provider to confirm your payment.' :
       paymentReturn === 'cancelled' && !order.paid_at ? 'Checkout cancelled. You can return to the same approved proof.' : undefined} />
@@ -237,7 +240,7 @@ export function OrderScreen({ id }: { id: string }) {
       <div className="stack order-main">
         {order.proof_state === 'changes' && latestComment ? <Feedback info={`Changes requested. ${latestComment}`} /> : null}
         {testAttempt ? <section className="panel test-pay">
-          <div className="panel-head"><h2>Test checkout</h2><p>Local simulation for {money(order.price.total)}. No money is collected.</p></div>
+          <div className="panel-head"><h2>Test checkout</h2><p>Simulated payment of {money(order.price.total, order.price.currency)}.</p></div>
           <div className="actions"><button className="button secondary" disabled={busy} onClick={() => setTestAttempt('')}>Cancel checkout</button>
             <button className="button" disabled={busy} onClick={() => void action('demo-payment', { attemptId: testAttempt })}>Confirm test payment</button></div>
         </section> : null}

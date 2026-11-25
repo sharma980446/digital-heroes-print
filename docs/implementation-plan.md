@@ -1,13 +1,13 @@
 # Digital Heroes implementation plan
 
-The submission is an operational print workflow for six divisions. The HR brief defines the deliverables and evaluation. The build PRD supplies the demo prices, rules for resolving proof and payment races, fixture sizes, and acceptance examples. Treat GBP, 20% VAT, shop collection, and RGB print profiles as demo settings. The HR phrase “score / configuration” is satisfied with the saved configuration because the brief gives no scoring model.
+The submission is an operational print workflow for six divisions. The HR brief defines the deliverables and evaluation. The build PRD supplies the demo price values, rules for resolving proof and payment races, fixture sizes, and acceptance examples. New quotes use INR with the existing numeric fixture values and a 20% demo tax rate. Shop collection and RGB print profiles also use demo settings. The HR phrase “score / configuration” is satisfied with the saved configuration because the brief gives no scoring model.
 
 ## Delivery sequence
 
 | Milestone | Work | Exit evidence |
 | --- | --- | --- |
 | 1. Race order | Sign-in, live quote, durable order, server CSV mapping and fitting, versioned proofs, test payment, background rendering, staff download. | Three rows including `007`, v1 change request and v2 approval, one payment/job on replay, three PDF/PNG pairs, correct boxes, customer access denied to staff files. |
-| 2. Catalogue and artwork | Enable all six products on the same model. Add identical-copy mode, editor, approved gallery, upload conversion, and more profiles. | 100 matte stickers total £108.00. The PDF trims to 50 × 50 mm and a 300 ppi PNG with 3 mm bleed measures 661 × 661 px. Each accepted upload format has a checked sample. |
+| 2. Catalogue and artwork | Enable all six products on the same model. Add identical-copy mode, editor, approved gallery, upload conversion, and more profiles. | 100 matte stickers total ₹108.00. The PDF trims to 50 × 50 mm and a 300 ppi PNG with 3 mm bleed measures 661 × 661 px. Each accepted upload format has a checked sample. |
 | 3. Operations | Complete dashboards, archived orders, reports, receipts, account and catalogue management, accounting export, reorder and email outbox. | Run both customer journeys and staff completion. Confirm current prices on reorder, report totals, report filters and notification delivery. |
 | 4. Submission | Apply migrations to a new Supabase project. Deploy Next.js on a new Vercel account and run the worker with private credentials. Configure Stripe test webhooks and email and seed reviewer accounts. | Public URL, private delivery of both credentials, schema and setup instructions, sample CSV and downloadable proof/output evidence. Run all ten acceptance cases from a clean session. |
 

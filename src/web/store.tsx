@@ -130,7 +130,8 @@ function QuoteForm({ product, available }: { product: Product; available: boolea
     }
     setBusy(true);
     try {
-      const fingerprint = JSON.stringify({ configuration: config, total: pricing.quote.total, productRevision: product.revision });
+      const fingerprint = JSON.stringify({ configuration: config, currency: pricing.quote.currency,
+        total: pricing.quote.total, productRevision: product.revision });
       const keyName = `${savedConfiguration(product.id)}:confirmation`;
       let key = crypto.randomUUID();
       try {

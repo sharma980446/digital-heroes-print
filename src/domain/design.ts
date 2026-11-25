@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { Configuration, Product } from './catalogue';
+import type { Configuration, ProductSnapshot } from './catalogue';
 
 const color = z.string().regex(/^#[0-9a-f]{6}$/i);
 const position = {
@@ -43,17 +43,17 @@ export type PrintAsset = {
 export type Snapshot = {
   renderer: 'rgb-v1';
   config: Configuration;
-  product: Product;
+  product: ProductSnapshot;
   design: Design;
   runners: Runner[];
   assets: PrintAsset[];
 };
 
-export function defaultDesign(product: Product): Design {
+export function defaultDesign(product: ProductSnapshot): Design {
   return { mode: 'editor', title: product.sample, background: product.background, ink: product.ink, elements: [] };
 }
 
-export function printSize(config: Configuration, product: Product, ppi = product.ppi) {
+export function printSize(config: Configuration, product: ProductSnapshot, ppi = product.ppi) {
   const trimWidth = config.width;
   const trimHeight = config.height;
   const widthMm = trimWidth + product.bleed * 2;

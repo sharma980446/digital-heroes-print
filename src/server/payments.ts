@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import Stripe from 'stripe';
 import { z } from 'zod';
-import { PrintError } from '@/domain/catalogue';
+import { ORDER_CURRENCY, PrintError, type OrderCurrency } from '@/domain/catalogue';
 import type { Account } from './auth';
 import { appOrigin, hosted, requiredEnv } from './config';
 import { database } from './db';
@@ -14,7 +14,7 @@ type Attempt = {
   provider: 'demo' | 'stripe';
   provider_session: string | null;
   expected_amount: number;
-  currency: 'GBP';
+  currency: OrderCurrency;
   status: 'open' | 'closed' | 'settled';
 };
 
@@ -46,6 +46,7 @@ export async function checkout(account: Account, orderId: string) {
     if (order.proof_state !== 'approved' || !order.current_proof_id || order.paid_at || order.payment_review) {
       throw new PrintError('Approve the current proof before checkout.', 409);
     }
+    if (order.price.currency !== ORDER_CURRENCY) throw new PrintError('Accept an INR quote before starting checkout.', 409);
     const [open] = await tx.query<Attempt>(
       "select * from printshop.checkout_attempts where order_id=$1 and proof_id=$2 and status='open'", [orderId, order.current_proof_id]);
     if (open) return { attempt: open, order };
@@ -78,7 +79,7 @@ export async function checkout(account: Account, orderId: string) {
       quantity: 1, price_data: {
         currency: attempt.currency.toLowerCase(), unit_amount: attempt.expected_amount,
         product_data: { name: `DH${order.number} · ${order.product_snapshot.title}`,
-          description: `${order.config.quantity} units, VAT included` },
+          description: `${order.config.quantity} units, tax included` },
       },
     }],
   }, { idempotencyKey: `digital-heroes-${attempt.id}` });
@@ -138,6 +139,7 @@ export async function payInDemo(account: Account, orderId: string, attemptId: st
   const [attempt] = await db.query<Attempt>(
     "select * from printshop.checkout_attempts where id=$1 and order_id=$2 and provider='demo'", [attemptId, orderId]);
   if (!attempt?.provider_session) throw new PrintError('Checkout not found.', 404);
+  if (attempt.currency !== ORDER_CURRENCY) throw new PrintError('Accept an INR quote before starting checkout.', 409);
   return applySettlement({
     provider: 'demo', attemptId, orderId, proofId: attempt.proof_id,
     session: attempt.provider_session, eventId: `demo_event_${attemptId}`, reference: `demo_${attemptId}`,

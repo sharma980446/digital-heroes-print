@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+export const ORDER_CURRENCY = 'INR' as const;
+const minimumCheckoutMinor = 50;
+
 export const productSchema = z.object({
   id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
   title: z.string().trim().min(2).max(64),
@@ -9,8 +12,8 @@ export const productSchema = z.object({
   bleed: z.number().int().min(0).max(8),
   safeInset: z.number().min(0).max(4),
   ppi: z.number().int().min(150).max(450),
-  basePence: z.number().int().min(1).max(20000),
-  vatBps: z.number().int().min(0).max(3000),
+  basePriceMinor: z.number().int().min(1).max(20000),
+  taxBps: z.number().int().min(0).max(3000),
   revision: z.number().int().min(1),
   background: z.string().regex(/^#[0-9a-f]{6}$/i),
   ink: z.string().regex(/^#[0-9a-f]{6}$/i),
@@ -25,27 +28,28 @@ export const productSchema = z.object({
 });
 
 export type Product = z.infer<typeof productSchema>;
+export type ProductSnapshot = Omit<Product, 'basePriceMinor' | 'taxBps'>;
 
 const defaults = {
   revision: 1,
   ppi: 300,
-  vatBps: 2000,
+  taxBps: 2000,
   active: true,
   personalized: false,
 };
 
 export const seedCatalogue: Product[] = [
-  { ...defaults, id: 'stickers', title: 'Labels & stickers', description: 'Branded labels, packaging seals and decals.', referenceWidth: 50, referenceHeight: 50, bleed: 3, safeInset: 3, basePence: 100, background: '#fce9b6', ink: '#232c2a', sample: 'Morning Club',
+  { ...defaults, id: 'stickers', title: 'Labels & stickers', description: 'Branded labels, packaging seals and decals.', referenceWidth: 50, referenceHeight: 50, bleed: 3, safeInset: 3, basePriceMinor: 100, background: '#fce9b6', ink: '#232c2a', sample: 'Morning Club',
     materials: [{ id: 'matte', title: 'Matte vinyl', multiplierBps: 10000 }, { id: 'gloss', title: 'Gloss vinyl', multiplierBps: 12000 }] },
-  { ...defaults, id: 'race', title: 'Race & event numbers', description: 'One bib design, a different runner on every copy.', referenceWidth: 200, referenceHeight: 150, bleed: 3, safeInset: 4, basePence: 200, background: '#f7f9ec', ink: '#20352a', sample: 'City Loop Run', personalized: true,
+  { ...defaults, id: 'race', title: 'Race & event numbers', description: 'One bib design, a different runner on every copy.', referenceWidth: 200, referenceHeight: 150, bleed: 3, safeInset: 4, basePriceMinor: 200, background: '#f7f9ec', ink: '#20352a', sample: 'City Loop Run', personalized: true,
     materials: [{ id: 'synthetic', title: 'Synthetic paper', multiplierBps: 10000 }] },
-  { ...defaults, id: 'mtb', title: 'MTB boards', description: 'Number boards for the start line and the trail.', referenceWidth: 200, referenceHeight: 150, bleed: 3, safeInset: 4, basePence: 500, background: '#e0eadf', ink: '#263e34', sample: 'Trail Series',
+  { ...defaults, id: 'mtb', title: 'MTB boards', description: 'Number boards for the start line and the trail.', referenceWidth: 200, referenceHeight: 150, bleed: 3, safeInset: 4, basePriceMinor: 500, background: '#e0eadf', ink: '#263e34', sample: 'Trail Series',
     materials: [{ id: 'rigid', title: 'Rigid plastic', multiplierBps: 10000 }] },
-  { ...defaults, id: 'stamps', title: 'Stamps', description: 'A repeatable mark for paperwork and packaging.', referenceWidth: 50, referenceHeight: 20, bleed: 0, safeInset: 2, basePence: 800, background: '#f7f4ee', ink: '#232321', sample: 'Packed today',
+  { ...defaults, id: 'stamps', title: 'Stamps', description: 'A repeatable mark for paperwork and packaging.', referenceWidth: 50, referenceHeight: 20, bleed: 0, safeInset: 2, basePriceMinor: 800, background: '#f7f4ee', ink: '#232321', sample: 'Packed today',
     materials: [{ id: 'rubber', title: 'Rubber', multiplierBps: 10000 }] },
-  { ...defaults, id: 'trophies', title: 'Trophies', description: 'Personalised plates for awards and milestones.', referenceWidth: 70, referenceHeight: 30, bleed: 0, safeInset: 2, basePence: 1200, background: '#e7d8b3', ink: '#322d1d', sample: 'First Place',
+  { ...defaults, id: 'trophies', title: 'Trophies', description: 'Personalised plates for awards and milestones.', referenceWidth: 70, referenceHeight: 30, bleed: 0, safeInset: 2, basePriceMinor: 1200, background: '#e7d8b3', ink: '#322d1d', sample: 'First Place',
     materials: [{ id: 'aluminium', title: 'Aluminium plate', multiplierBps: 10000 }] },
-  { ...defaults, id: 'laser', title: 'Laser-cut work', description: 'Artwork for engraved tags and small signage.', referenceWidth: 80, referenceHeight: 40, bleed: 0, safeInset: 2, basePence: 400, background: '#edd9c5', ink: '#3f2e28', sample: 'Field Notes',
+  { ...defaults, id: 'laser', title: 'Laser-cut work', description: 'Artwork for engraved tags and small signage.', referenceWidth: 80, referenceHeight: 40, bleed: 0, safeInset: 2, basePriceMinor: 400, background: '#edd9c5', ink: '#3f2e28', sample: 'Field Notes',
     materials: [{ id: 'plywood', title: 'Plywood', multiplierBps: 10000 }] },
 ];
 
@@ -105,21 +109,38 @@ export function quoteProduct(product: Product, input: Configuration) {
 
   const { quantity } = config;
   const discountBps = quantity >= 500 ? 1500 : quantity >= 100 ? 1000 : 0;
-  const lineNumerator = BigInt(product.basePence) * BigInt(config.width * config.height) *
+  const lineNumerator = BigInt(product.basePriceMinor) * BigInt(config.width * config.height) *
     BigInt(material.multiplierBps) * BigInt(quantity);
   const lineDenominator = BigInt(width * height) * 10000n;
   const beforeDiscount = roundHalfUp(lineNumerator, lineDenominator);
   const subtotal = roundHalfUp(lineNumerator * BigInt(10000 - discountBps), lineDenominator * 10000n);
-  const tax = roundHalfUp(BigInt(subtotal) * BigInt(product.vatBps), 10000n);
+  const tax = roundHalfUp(BigInt(subtotal) * BigInt(product.taxBps), 10000n);
+  const total = subtotal + tax;
+  if (total < minimumCheckoutMinor) {
+    throw new PrintError(`The minimum order total is ${money(minimumCheckoutMinor)}. Increase the quantity or choose a larger size.`);
+  }
   return {
-    currency: 'GBP' as const, basePence: product.basePence,
+    currency: ORDER_CURRENCY, basePriceMinor: product.basePriceMinor,
     referenceAreaMm2: width * height, materialMultiplierBps: material.multiplierBps,
-    material: material.title, discountBps, vatBps: product.vatBps, beforeDiscount,
-    discount: beforeDiscount - subtotal, subtotal, tax, total: subtotal + tax,
-    unitAverage: roundHalfUp(BigInt(subtotal + tax), BigInt(quantity)),
+    material: material.title, discountBps, taxBps: product.taxBps, beforeDiscount,
+    discount: beforeDiscount - subtotal, subtotal, tax, total,
+    unitAverage: roundHalfUp(BigInt(total), BigInt(quantity)),
   };
 }
 
 export type Quote = ReturnType<typeof quoteProduct>;
-const pounds = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' });
-export const money = (pence: number) => pounds.format(pence / 100);
+export const storedCurrencies = [ORDER_CURRENCY, 'GBP'] as const;
+export type OrderCurrency = (typeof storedCurrencies)[number];
+export type PriceSnapshot = Omit<Quote, 'currency' | 'basePriceMinor' | 'taxBps'> & { currency: OrderCurrency };
+
+const currencyFormats = new Map([
+  [ORDER_CURRENCY, new Intl.NumberFormat('en-IN', { style: 'currency', currency: ORDER_CURRENCY })],
+  ['GBP', new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })],
+]);
+
+export function money(amountMinor: number, currency: string = ORDER_CURRENCY) {
+  const format = currencyFormats.get(currency);
+  return format ? format.format(amountMinor / 100) : `${currency} ${amountMinor} minor units`;
+}
+
+export const taxName = (currency: OrderCurrency) => currency === ORDER_CURRENCY ? 'Tax' : 'VAT';

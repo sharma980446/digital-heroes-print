@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { configurationSchema, money, PrintError, productSchema, quoteProduct, type Configuration, type Product, type Quote } from '@/domain/catalogue';
+import { configurationSchema, money, PrintError, productSchema, quoteProduct, storedCurrencies,
+  type Configuration, type OrderCurrency, type PriceSnapshot, type Product, type ProductSnapshot, type Quote } from '@/domain/catalogue';
 import { defaultDesign, designSchema, type Design, type PrintAsset, type Snapshot } from '@/domain/design';
 import type { Account } from './auth';
 import { hosted } from './config';
@@ -16,8 +17,8 @@ export type Order = {
   owner_id: string;
   product_id: string;
   config: Configuration;
-  product_snapshot: Product;
-  price: Quote;
+  product_snapshot: ProductSnapshot;
+  price: PriceSnapshot;
   draft: Design;
   draft_csv: string;
   draft_mapping: { name: string; number: string };
@@ -65,6 +66,7 @@ export type ProductionFile = {
 
 export const quoteInput = z.object({
   configuration: configurationSchema,
+  currency: z.enum(storedCurrencies),
   total: z.number().int().nonnegative(),
   productRevision: z.number().int().positive(),
 });
@@ -102,10 +104,9 @@ export async function getProduct(db: Query, id: string) {
 async function checkedQuote(db: Query, input: z.infer<typeof quoteInput>) {
   const product = await getProduct(db, input.configuration.productId);
   const price = quoteProduct(product, input.configuration);
-  if (product.revision !== input.productRevision || price.total !== input.total) {
-    throw new PrintError(`This quote has changed to ${money(price.total)}. Refresh the quote and confirm the current price.`, 409);
+  if (product.revision !== input.productRevision || price.currency !== input.currency || price.total !== input.total) {
+    throw new PrintError(`This quote has changed to ${money(price.total, price.currency)}. Refresh the quote and confirm the current price.`, 409);
   }
-  if (price.total < 30) throw new PrintError('The minimum checkout total is £0.30.');
   return { product, price };
 }
 
@@ -145,7 +146,7 @@ async function insertOrder(tx: Query, account: Account, key: string, config: Con
       j(source?.draft_mapping ?? { name: 'name', number: 'number' }), source?.id ?? null]);
   if (!order) {
     const [existing] = await tx.query<Order>('select * from printshop.orders where owner_id = $1 and idempotency_key = $2', [account.id, key]);
-    if (existing.product_id !== config.productId || existing.price.total !== price.total ||
+    if (existing.product_id !== config.productId || existing.price.currency !== price.currency || existing.price.total !== price.total ||
         Object.keys(config).some((field) => config[field as keyof Configuration] !== existing.config[field as keyof Configuration]) ||
         existing.reordered_from !== (source?.id ?? null)) {
       throw new PrintError('A different order already used this confirmation. Submit the current quote again.', 409);
@@ -161,7 +162,7 @@ export async function createOrder(account: Account, input: z.infer<typeof create
   return (await database()).transaction(async (tx) => {
     const [existing] = await tx.query<Order>('select * from printshop.orders where owner_id=$1 and idempotency_key=$2', [account.id, input.key]);
     if (existing) {
-      if (existing.price.total !== input.total || existing.product_snapshot.revision !== input.productRevision ||
+      if (existing.price.currency !== input.currency || existing.price.total !== input.total || existing.product_snapshot.revision !== input.productRevision ||
           Object.keys(input.configuration).some((key) => existing.config[key as keyof Configuration] !== input.configuration[key as keyof Configuration]) ||
           existing.reordered_from) throw new PrintError('This confirmation already belongs to another order.', 409);
       return existing;
@@ -190,7 +191,7 @@ export async function reviseQuote(account: Account, id: string, input: z.infer<t
     await closeAttempts(tx, id);
     await tx.query(`update printshop.orders set config=$2, product_snapshot=$3, price=$4, stage='artwork',
       proof_state='draft', revision=revision+1, updated_at=now() where id=$1`, [id, j(input.configuration), j(product), j(price)]);
-    await event(tx, id, 'quote_revised', { actor: account.id, details: { total: price.total, configuration: input.configuration } });
+    await event(tx, id, 'quote_revised', { actor: account.id, details: { currency: price.currency, total: price.total, configuration: input.configuration } });
   });
 }
 
@@ -302,8 +303,8 @@ export async function orderDetails(account: Account, id: string) {
   const timeline = await db.query<{ id: string; event_type: string; created_at: Date; detail: Record<string, string>; actor: string | null }>(`
     select e.id,e.event_type,e.created_at,e.detail,a.display_name as actor from printshop.order_events e
     left join printshop.accounts a on a.id=e.actor_id where e.order_id=$1 order by e.id desc limit 60`, [id]);
-  const payments = await db.query<{ amount: number; reference: string; provider: string; status: string; paid_at: Date; review_reason: string | null }>(`
-    select amount,reference,provider,status,paid_at,review_reason from printshop.payments where order_id=$1 order by paid_at desc`, [id]);
+  const payments = await db.query<{ amount: number; currency: string; reference: string; provider: string; status: string; paid_at: Date; review_reason: string | null }>(`
+    select amount,currency,reference,provider,status,paid_at,review_reason from printshop.payments where order_id=$1 order by paid_at desc`, [id]);
   const job = await currentJob(db, id);
   const unlocked = account.role === 'staff' && productionUnlocked(order, job);
   const files = unlocked ? await db.query<Omit<ProductionFile, 'object_key'>>(
@@ -325,11 +326,11 @@ export const orderFilter = z.object({
 
 export async function listOrders(account: Account, filters: z.infer<typeof orderFilter>) {
   return (await database()).query<{
-    id: string; number: string; stage: Stage; title: string; quantity: number; amount: number; created_at: Date;
+    id: string; number: string; stage: Stage; title: string; quantity: number; amount: number; currency: OrderCurrency; created_at: Date;
     customer: string; product_id: string; proof_state: Order['proof_state']; paid: boolean; payment_review: boolean; files: string | null;
     configuration: Configuration; proof_id: string | null;
   }>(`select o.id,o.number,o.stage,o.product_snapshot->>'title' as title,(o.config->>'quantity')::int as quantity,
-      (o.price->>'total')::int as amount,o.created_at,a.display_name as customer,o.product_id,o.proof_state,
+      (o.price->>'total')::int as amount,o.price->>'currency' as currency,o.created_at,a.display_name as customer,o.product_id,o.proof_state,
       o.paid_at is not null as paid,o.payment_review,j.status as files,o.config as configuration,o.current_proof_id as proof_id
     from printshop.orders o join printshop.accounts a on a.id=o.owner_id
     left join printshop.jobs j on j.order_id=o.id and j.proof_id=o.current_proof_id

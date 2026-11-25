@@ -23,7 +23,7 @@ export function OrderRows({ orders, staff = false }: { orders: Orders; staff?: b
       <div className="row-status"><Tag tone={order.stage === 'completed' ? 'good' : 'neutral'}>{stateName(order.stage)}</Tag>
         {staff || !order.paid ? <small>{order.payment_review ? 'Payment review' : order.paid ? 'Paid' : 'Unpaid'}
           {staff ? ` · ${order.files ? stateName(order.files) : 'Files locked'}` : ''}</small> : null}</div>
-      <b>{money(order.amount)}</b>
+      <b>{money(order.amount, order.currency)}</b>
     </Link>)}
   </div>;
 }

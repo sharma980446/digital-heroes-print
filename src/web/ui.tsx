@@ -117,13 +117,13 @@ export function QuoteSummary({ quote, children }: { quote: Quote | null; childre
   return <aside className="quote-summary" aria-label="Price summary">
     <p className="eyebrow">YOUR QUOTE</p>
     <div className="quote-value" aria-live="polite">
-      {quote ? money(quote.total) : '—'} <small>{quote ? 'incl. VAT' : ''}</small>
+      {quote ? money(quote.total, quote.currency) : '—'} <small>{quote ? 'incl. tax' : ''}</small>
     </div>
     {quote ? <dl className="money-lines">
-      <div><dt>Before discount</dt><dd>{money(quote.beforeDiscount)}</dd></div>
-      {quote.discountBps > 0 ? <div><dt>Volume discount ({quote.discountBps / 100}%)</dt><dd>−{money(quote.discount)}</dd></div> : null}
-      <div><dt>VAT ({quote.vatBps / 100}%)</dt><dd>{money(quote.tax)}</dd></div>
-      <div><dt>Average per unit</dt><dd>{money(quote.unitAverage)}</dd></div>
+      <div><dt>Before discount</dt><dd>{money(quote.beforeDiscount, quote.currency)}</dd></div>
+      {quote.discountBps > 0 ? <div><dt>Volume discount ({quote.discountBps / 100}%)</dt><dd>−{money(quote.discount, quote.currency)}</dd></div> : null}
+      <div><dt>Tax ({quote.taxBps / 100}%)</dt><dd>{money(quote.tax, quote.currency)}</dd></div>
+      <div><dt>Average per unit</dt><dd>{money(quote.unitAverage, quote.currency)}</dd></div>
     </dl> : <p className="muted">Enter valid dimensions and quantity for a total.</p>}
     {children}
   </aside>;

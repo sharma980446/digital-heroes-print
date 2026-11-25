@@ -144,14 +144,14 @@ async function main() {
     await staff.getByRole('row', { name: /Race & event numbers/ }).waitFor();
     const accounting = await desktop.request.get(route('staff/export'));
     assert.equal(accounting.status(), 200);
-    assert.match(await accounting.text(), new RegExp(`DH${first.order.number}`));
+    assert.match(await accounting.text(), new RegExp(`"DH${first.order.number}","[^\\n]+","7\\.20","INR",`));
     await phone.reload();
     await phone.getByRole('button', { name: 'Reorder design' }).click();
     await phone.waitForURL((url) => url.pathname.startsWith('/orders/') && url.pathname !== raceUrl.pathname);
     await phone.getByText('Approval carried over from', { exact: false }).waitFor();
 
     await phone.goto(`${base}/products/stickers`);
-    await phone.locator('.quote-value').getByText('£108.00', { exact: false }).waitFor();
+    await phone.locator('.quote-value').getByText('₹108.00', { exact: false }).waitFor();
     await fitsViewport(phone, '360 px sticker quote');
     await phone.getByRole('button', { name: 'Create order' }).click();
     await phone.waitForURL('**/orders/*');
@@ -167,6 +167,7 @@ async function main() {
     await phone.getByRole('button', { name: 'Publish proof' }).click();
     await phone.getByRole('button', { name: 'Approve v1' }).click();
     await phone.getByRole('button', { name: 'Continue to test checkout' }).click();
+    await phone.getByText('Simulated payment of ₹108.00.', { exact: true }).waitFor();
     await phone.getByRole('button', { name: 'Confirm test payment' }).click();
     await phone.getByRole('link', { name: 'Download receipt' }).waitFor();
     await staff.goto(stickerUrl.href);
@@ -183,6 +184,7 @@ async function main() {
     const receipt = await mobile.request.get(route(`orders/${stickerId}/receipt`));
     assert.equal(receipt.status(), 200);
     assert.equal(receipt.headers()['content-type'], 'application/pdf');
+    await writeFile(path.join(output, 'sticker-receipt.pdf'), await receipt.body());
     assert.deepEqual(browserErrors, []);
     console.log(`Browser acceptance passed. Race ${first.order.number} and sticker ${(await (await mobile.request.get(route(`orders/${stickerId}`))).json()).order.number}. Artifacts saved to test-results/browser.`);
   } finally {

@@ -66,6 +66,10 @@ async function connect(): Promise<Database> {
   if (!migration) {
     await engine.exec(await readFile(path.join(process.cwd(), 'supabase/migrations/0002_canonical_proofs_and_archives.sql'), 'utf8'));
   }
+  const [legacyCatalogue] = await db.query("select 1 from printshop.catalogue where definition ? 'basePence' limit 1");
+  if (legacyCatalogue) {
+    await engine.exec(await readFile(path.join(process.cwd(), 'supabase/migrations/0004_inr_catalogue.sql'), 'utf8'));
+  }
   await seedProducts(db);
   return db;
 }

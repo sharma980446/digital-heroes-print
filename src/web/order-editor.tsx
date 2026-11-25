@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { money, type Configuration, type Product } from '@/domain/catalogue';
+import { ORDER_CURRENCY, money, type Configuration, type Product } from '@/domain/catalogue';
 import { defaultDesign, printSize, type Design, type DrawElement } from '@/domain/design';
 import type { Order } from '@/server/orders';
 import { ConfigFields, quoteView, useCatalogue } from './store';
@@ -51,18 +51,22 @@ function RevisedQuote({ order, product, onSave }: { order: Order; product: Produ
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const pricing = quoteView(product, config);
-  return <details className="panel config-change">
-    <summary>Change print configuration</summary>
+  const needsInrQuote = order.price.currency !== ORDER_CURRENCY;
+  const unchanged = !needsInrQuote && order.product_snapshot.revision === product.revision &&
+    JSON.stringify(config) === JSON.stringify(order.config);
+  return <details className="panel config-change" open={needsInrQuote || undefined}>
+    <summary>{needsInrQuote ? 'Update quote to INR' : 'Change print configuration'}</summary>
     <ConfigFields product={product} config={config} update={setConfig} />
     <Feedback error={error || pricing.error} />
     <div className="actions">
-      {pricing.quote ? <b>{money(pricing.quote.total)} incl. VAT</b> : null}
-      <button className="button secondary" disabled={!pricing.quote || busy || (JSON.stringify(config) === JSON.stringify(order.config) && order.product_snapshot.revision === product.revision)}
+      {pricing.quote ? <b>{money(pricing.quote.total, pricing.quote.currency)} incl. tax</b> : null}
+      <button className="button secondary" disabled={!pricing.quote || busy || unchanged}
         onClick={async () => {
+          if (!pricing.quote) return;
           setError(''); setBusy(true);
           try {
             await api(`orders/${order.id}/configure`, { configuration: config, productRevision: product.revision,
-              total: pricing.quote!.total, revision: order.revision });
+              currency: pricing.quote.currency, total: pricing.quote.total, revision: order.revision });
             onSave();
           } catch (problem) { setError(message(problem)); }
           finally { setBusy(false); }

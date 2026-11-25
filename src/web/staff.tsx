@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { money, type Product } from '@/domain/catalogue';
+import { ORDER_CURRENCY, money, type OrderCurrency, type Product } from '@/domain/catalogue';
 import type { Account } from '@/server/auth';
 import type { listOrders } from '@/server/orders';
 import type { reports } from '@/server/operations';
@@ -46,7 +46,10 @@ function Reports() {
   const [query, setQuery] = useState('');
   const result = useLoad<Awaited<ReturnType<typeof reports>>>(`staff/reports?${query}`);
   const { catalogue } = useCatalogue();
-  const gross = result.data?.reduce((sum, row) => sum + row.revenue, 0) ?? 0;
+  const gross = new Map<OrderCurrency, number>([[ORDER_CURRENCY, 0]]);
+  for (const row of result.data ?? []) {
+    if (row.revenue) gross.set(row.currency, (gross.get(row.currency) ?? 0) + row.revenue);
+  }
   const units = result.data?.reduce((sum, row) => sum + row.units, 0) ?? 0;
   return <>
     <form className="filter-bar report-filter" onSubmit={(event) => { event.preventDefault(); setQuery(parameters({ from, to })); }}>
@@ -59,10 +62,11 @@ function Reports() {
     {result.loading ? <Loading /> : null}
     {result.data ? <>
       <div className="report-metrics"><div><span>Orders created</span><strong>{result.data.reduce((sum, item) => sum + item.orders, 0)}</strong></div>
-        <div><span>Gross collected (GBP, test)</span><strong>{money(gross)}</strong></div><div><span>Completed units</span><strong>{units}</strong></div></div>
+        <div><span>Gross collected (test)</span>{[...gross].map(([currency, amount]) => <strong key={currency}>{money(amount, currency)}</strong>)}</div>
+        <div><span>Completed units</span><strong>{units}</strong></div></div>
       <div className="table-scroll"><table><thead><tr><th>Product family</th><th>Orders</th><th>Gross</th><th>Completed jobs</th><th>Units</th></tr></thead>
-        <tbody>{result.data.map((row) => <tr key={row.family}><th>{catalogue.find(({ id }) => id === row.family)?.title ?? row.family}</th>
-          <td>{row.orders}</td><td>{money(row.revenue)}</td><td>{row.completed}</td><td>{row.units}</td></tr>)}</tbody></table></div>
+        <tbody>{result.data.map((row) => <tr key={`${row.family}-${row.currency}`}><th>{catalogue.find(({ id }) => id === row.family)?.title ?? row.family}</th>
+          <td>{row.orders}</td><td>{money(row.revenue, row.currency)}</td><td>{row.completed}</td><td>{row.units}</td></tr>)}</tbody></table></div>
     </> : null}
   </>;
 }
@@ -72,7 +76,7 @@ function ProductEditor({ initial, refresh }: { initial: Product; refresh: () => 
   const [status, setStatus] = useState<{ error?: string; info?: string }>({});
   const [busy, setBusy] = useState(false);
   const fields = [
-    ['basePence', 'Base net (pence)'], ['vatBps', 'VAT (basis points)'], ['referenceWidth', 'Reference width (mm)'],
+    ['basePriceMinor', 'Base price (paise)'], ['taxBps', 'Demo tax (basis points)'], ['referenceWidth', 'Reference width (mm)'],
     ['referenceHeight', 'Reference height (mm)'], ['ppi', 'Resolution (ppi)'], ['bleed', 'Bleed (mm)'], ['safeInset', 'Safe inset (mm)'],
   ] as const;
   async function save(event: FormEvent) {

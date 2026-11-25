@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { PDFDocument, rgb } from 'pdf-lib';
 import sharp from 'sharp';
-import { defaultConfiguration, quoteProduct, seedCatalogue } from '../src/domain/catalogue';
+import { defaultConfiguration, money, quoteProduct, seedCatalogue } from '../src/domain/catalogue';
 import { defaultDesign, insideSafeArea, printSize, type Snapshot } from '../src/domain/design';
 import { mapRunners, readCsv } from '../src/server/csv';
 import { renderPdf, renderPng, validateArtwork } from '../src/server/render';
@@ -20,9 +20,14 @@ test('computes all sticky pricing examples, both thresholds and half-up tax', ()
   assert.equal(quoteProduct(stickers, { ...config, quantity: 499 }).total, 53892);
   assert.equal(quoteProduct(stickers, { ...config, quantity: 500 }).total, 51000);
   assert.deepEqual(quoteProduct(stickers, { ...config, width: 25, height: 51, orientation: 'portrait', quantity: 1 }),
-    { currency: 'GBP', basePence: 100, referenceAreaMm2: 2500, materialMultiplierBps: 10000, material: 'Matte vinyl',
-      discountBps: 0, vatBps: 2000, beforeDiscount: 51, discount: 0, subtotal: 51, tax: 10, total: 61, unitAverage: 61 });
-  assert.equal(quoteProduct({ ...stickers, basePence: 102 }, { ...config, width: 25, height: 25, quantity: 1 }).subtotal, 26);
+    { currency: 'INR', basePriceMinor: 100, referenceAreaMm2: 2500, materialMultiplierBps: 10000, material: 'Matte vinyl',
+      discountBps: 0, taxBps: 2000, beforeDiscount: 51, discount: 0, subtotal: 51, tax: 10, total: 61, unitAverage: 61 });
+  const smallestOrder = { ...config, width: 25, height: 25, quantity: 1 };
+  assert.equal(quoteProduct({ ...stickers, basePriceMinor: 202 }, smallestOrder).subtotal, 51);
+  assert.equal(quoteProduct({ ...stickers, basePriceMinor: 200, taxBps: 0 }, smallestOrder).total, 50);
+  assert.throws(() => quoteProduct(stickers, smallestOrder), /minimum order total is ₹0\.50/);
+  assert.equal(money(10800), '₹108.00');
+  assert.equal(money(123456789), '₹12,34,567.89');
   assert.throws(() => quoteProduct(stickers, { ...config, width: 24 }), /width/);
   assert.throws(() => quoteProduct(stickers, { ...config, quantity: 0 }));
   assert.throws(() => quoteProduct(stickers, { ...config, material: 'rubber' }), /material/);

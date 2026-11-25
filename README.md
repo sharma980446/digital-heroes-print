@@ -16,7 +16,9 @@ Open `http://127.0.0.1:3000`. Local mode creates a PostgreSQL database under `.d
 1. Open **Race & event numbers**. Keep the quantity at three and create an order. Upload [the sample CSV](public/samples/runners.csv) and publish v1. Check bib `007` and select the other two rows.
 2. Request changes. Open the same order from the staff queue, revise the event title and publish v2. Approve v2 as the customer, then confirm the simulated test payment.
 3. Open the staff order. Download one PDF, one PNG and the batch ZIP. Start production and mark it completed. Retrieve the job in **Archive**. Reorder its approved work from the customer account.
-4. Open **Labels & stickers** and choose 50 × 50 mm, Matte vinyl, 100 units. Confirm £108.00. Add a PNG logo or upload finished artwork, then approve and pay. Measure the single PDF/PNG pair. The PDF trim is 50 × 50 mm with a 56 × 56 mm bleed box. The 300 ppi PNG is 661 × 661 px.
+4. Open **Labels & stickers** and choose 50 × 50 mm, Matte vinyl, 100 units. Confirm ₹108.00 including demo tax. Add a PNG logo or upload finished artwork, then approve and pay. Measure the single PDF/PNG pair. The PDF trim is 50 × 50 mm with a 56 × 56 mm bleed box. The 300 ppi PNG is 661 × 661 px.
+
+New orders use Indian rupees. Catalogue settings use paise, so a base price of 100 means ₹1.00. If you open an unpaid quote from before the currency change, choose **Review INR quote** or **Update quote to INR** before checkout.
 
 For finished artwork, export one artboard at the order's dimensions including bleed. The SVG converter supports outlined paths and basic shapes. For AI uploads, enable **Create PDF Compatible File** when saving. Use a PNG above the required pixel count. The demo fonts support Latin and Latin Extended glyphs.
 
