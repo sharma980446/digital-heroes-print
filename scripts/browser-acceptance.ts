@@ -157,6 +157,18 @@ async function main() {
     await phone.waitForURL('**/orders/*');
     const stickerUrl = new URL(phone.url());
     const stickerId = stickerUrl.pathname.split('/').at(-1)!;
+    await phone.setViewportSize({ width: 320, height: 800 });
+    await phone.getByLabel('Background', { exact: true }).waitFor();
+    await fitsViewport(phone, '320 px sticker artwork editor');
+    const labelsFit = await phone.locator('.editor-palette').evaluate((palette) =>
+      [...palette.querySelectorAll('label')].every((label) => {
+        const text = document.createRange();
+        text.selectNodeContents(label.firstChild!);
+        return text.getBoundingClientRect().right <= label.getBoundingClientRect().right + 1;
+      }),
+    );
+    assert.ok(labelsFit, 'Artwork labels must fit their fields at 320 px');
+    await phone.setViewportSize({ width: 360, height: 800 });
     const logo = await sharp({ create: { width: 900, height: 900, channels: 3, background: '#20352a' } }).png().toBuffer();
     await phone.getByLabel('Add PNG logo').setInputFiles({ name: 'cafe-logo.png', mimeType: 'image/png', buffer: logo });
     await phone.getByLabel('Vertical centre (mm)').fill('12');

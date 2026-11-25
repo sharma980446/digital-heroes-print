@@ -316,7 +316,9 @@ thead th { font-size: .85rem; color: var(--muted); }
   .order-row { grid-template-columns: minmax(0, 1fr) auto; }
   .order-row b { grid-column: 2; grid-row: 1; align-self: start; }
   .row-status { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; }
-  .form-grid, .editor-palette { gap: .65rem; }
+  .form-grid { gap: .65rem; }
+  .editor-palette { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .editor-palette > .field:first-child { grid-column: 1 / -1; }
   .field input, .field select, .field textarea { font-size: 1rem; }
   .filter-bar, .material-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .filter-bar > *:first-child { grid-column: 1 / -1; }
